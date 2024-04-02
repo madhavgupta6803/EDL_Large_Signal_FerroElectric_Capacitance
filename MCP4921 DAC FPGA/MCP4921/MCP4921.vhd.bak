@@ -1,0 +1,98 @@
+-- MCP3008 --14/10/2020 --Amit Shetye
+Library ieee;
+Use ieee.std_logic_1164.All;
+Use ieee.numeric_std.All;
+Use ieee.std_logic_unsigned.All;
+
+	Entity MCP4921 Is
+		Port
+		(   	clk_50MHz 	: In std_logic;
+				reset 		: In std_logic;
+				Din 		: In std_logic_vector(11 downto 0);
+	
+				Dout 		: Out std_logic;
+				CS	 		: Out std_logic;
+				Sclk 		: Out std_logic;
+				LDAC 		: Out std_logic;
+				--output	 	: Out std_logic_vector(9 downto 0)
+		);				
+	End MCP4921;
+
+Architecture behave Of MCP4921 is
+
+	signal clk_int	: std_logic:='0';
+	--signal LDAC	: std_logic:='0';
+	signal count	: std_logic_vector (7 downto 0):= x"00";
+	signal op_bit	: std_logic_vector (15 downto 0):= x"0000";
+	signal bit_count: std_logic_vector (7 downto 0):= x"00";
+	signal counter	: std_logic_vector (7 downto 0):= x"00";
+	signal rx_buf	: std_logic_vector (9 downto 0):= b"0000000000";
+
+Begin	
+	
+	Sclk <= clk_int;
+	--output <= rx_buf;
+	
+	process(clk_50MHz)
+	begin									 		 
+		if (clk_50MHz'event and clk_50MHz = '1') then
+			if(count = x"05") then
+				clk_int <= not clk_int;
+				count <=  x"00";
+			else
+				count <= count + '1';	
+			end if;
+		end if;	
+	end process	;	
+	
+	process(clk_int)
+	begin
+		if(clk_int'event and clk_int = '0') then
+			if(reset = '0')	then
+				counter <= x"00";
+				Dout 	<= '1';	
+				CS	 	<= '1';
+				LDAC	<= '1';
+				op_bit(15 downto 12)	<= x"1";
+				op_bit(11 downto 00)	<= Din;
+				
+			elsif(counter = x"00" ) then		--reset
+				counter <= counter + '1';
+				Dout 	<= '1';	
+				CS	 	<= '1';	
+				LDAC	<= '1';
+				op_bit(15 downto 12)	<= x"1";
+				op_bit(11 downto 00)	<= Din;
+				
+			elsif(counter = x"01" ) then		--CS LOW
+				counter <= counter + '1';
+				Dout 	<= '1';	
+				CS	 	<= '0';	
+				LDAC	<= '1';
+				op_bit(15 downto 12)	<= x"1";
+				op_bit(11 downto 00)	<= Din;
+				
+			elsif(counter = x"02" ) then
+				if(bit_count <= x"0F" and bit_count>= x"00") then
+					Dout<=(to_integer (unsigned (op_bit)));
+					bit_count <= bit_count - '1';
+					
+				elsif(bit_count = x"FF") then
+					counter <= counter + '1';
+					bit_count <=x"0F"
+					CS	 	<= '1';
+					LDAC	<= '0';
+				end if;
+				
+			elsif(counter = x"03" ) then		-- load DAC = 0 
+				counter <= x"00";
+				Dout 	<= '1';	
+				CS	 	<= '1';
+				LDAC	<= '1';
+			end if;	
+			
+		end if;				
+	end process	;				 			 		 -- represent behavior
+		
+End Architecture behave;					
+					
